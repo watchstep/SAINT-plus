@@ -60,7 +60,7 @@ class SAINTPlusModule(nn.Module):
   def configure_optimizers(self):
     return torch.optim.Adam(self.parameters())
 
-  def training_step(self, batch, batch_ids):
+  def training_step(self, batch, batch_idx):
     input, labels = batch
     target_mask = (input["input_ids"] != 0)
     out = self(input, labels)
@@ -80,7 +80,7 @@ class SAINTPlusModule(nn.Module):
     self.print("train auc", auc)
     self.log("train_auc", auc)
 
-  def validation_step(self, batch, batch_ids):
+  def validation_step(self, batch, batch_idx):
     input, labels = batch
     target_mask = (input["input_ids"] != 0)
     out = self(input, labels)
@@ -89,7 +89,6 @@ class SAINTPlusModule(nn.Module):
     out = torch.sigmoid(out)
     labels = torch.masked_select(labels, target_mask)
     self.log("val_loss", loss, on_step=True, prog_bar=True)
-    output = {"outs": out, "labels": labels}
     return {"val_loss": loss, "outs": out, "labels": labels}
 
   def validation_epoch_end(self, validation_ouput):
@@ -103,12 +102,17 @@ class SAINTPlusModule(nn.Module):
   
   def test_step(self, batch, batch_idx):
     loss, auc = self._shared_eval_Step(batch, batch_idx)
-    return loss
+    return loss, auc
   
   def predict_step(self, batch, batch_idx, dataloader_idx):
-    x, y= batch
-    x = x.view(x.size(0), -1)
-    return self.encoder(x)
+    input, labels = batch
+    target_mask = (input["input_ids"] != 0)
+    out = self(input, labels)
+    loss = self.loss(out.float(), labels.float())
+    out = torch.masked_select(out, target_mask)
+    out = torch.sigmoid(out)
+    labels = torch.masked_select(labels, target_mask)
+    return labels
   
   
 
